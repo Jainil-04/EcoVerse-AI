@@ -1,0 +1,24 @@
+[
+  {
+    "id": "badge_green",
+    "name": "Green Champion Badge",
+    "points_required": 50,
+    "type": "digital",
+    "approved": true
+  },
+  {
+    "id": "certificate_eco",
+    "name": "Eco Sustainability Certificate",
+    "points_required": 100,
+    "type": "digital",
+    "approved": true
+  },
+  {
+    "id": "canteen_discount",
+    "name": "Campus Canteen Discount",
+    "points_required": 150,
+    "type": "campus",
+    "approved": false
+  }
+]
+
