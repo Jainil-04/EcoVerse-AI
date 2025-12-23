@@ -1,6 +1,22 @@
 import streamlit as st
 import json
 import os
+import pandas as pd
+os.makedirs("data", exist_ok=True)
+
+# ==============================
+# STEP 6.3 — Admin-only access
+# ==============================
+
+if not st.session_state.get("logged_in"):
+    st.error("🔒 Please login to access the Admin Dashboard.")
+    st.stop()
+
+if st.session_state.get("role") != "admin":
+    st.error("🚫 Access denied. Admins only.")
+    st.stop()
+
+
 
 USERS_FILE = "data/users.json"
 TRANSACTIONS_FILE = "data/transactions.json"
@@ -47,6 +63,20 @@ st.metric("Total Carbon Points Issued", total_points)
 st.metric("Total Transactions Logged", total_transactions)
 
 st.markdown("---")
+# =========================
+# Chart 1: Points by User
+# =========================
+st.subheader("📊 Carbon Points Distribution")
+
+if users:
+    points_df = pd.DataFrame([
+        {"User": user_data["name"], "Points": user_data["points"]}
+        for user_data in users.values()
+    ])
+
+    st.bar_chart(points_df.set_index("User"))
+else:
+    st.info("No user data available for chart.")
 
 # =============================
 # SECTION 2: Leaderboard
@@ -63,6 +93,22 @@ for rank, (user_id, user_data) in enumerate(sorted_users, start=1):
     st.write(f"{rank}. **{user_data['name']}** — {user_data['points']} points")
 
 st.markdown("---")
+# =========================
+# Chart 2: Transactions Over Time
+# =========================
+st.subheader("🕒 Transactions Over Time")
+
+if transactions:
+    txn_df = pd.DataFrame(transactions)
+
+    txn_df["timestamp"] = pd.to_datetime(txn_df["timestamp"])
+    txn_df["date"] = txn_df["timestamp"].dt.date
+
+    daily_txns = txn_df.groupby("date").size()
+
+    st.line_chart(daily_txns)
+else:
+    st.info("No transactions available.")
 
 # =============================
 # SECTION 3: Pending Reward Approvals
@@ -75,22 +121,58 @@ pending = [
 ]
 
 if not pending:
-    st.success("No pending approvals.")
+	st.success("No pending approvals.")
 else:
     for idx, txn in enumerate(pending):
-        with st.container():
-            st.write(f"User: {txn['user']}")
-            st.write(f"Reward: {txn['reward']}")
-            st.write(f"Points Spent: {txn['points_spent']}")
-            st.write(f"Timestamp: {txn['timestamp']}")
+        st.markdown("### 🎁 Reward Request")
+        st.write(f"👤 User: **{txn['user']}**")
+        st.write(f"🏆 Reward: **{txn['reward']}**")
+        st.write(f"💰 Points Spent: **{txn['points_spent']}**")
+        st.write(f"🕒 Time: {txn['timestamp']}")
 
-            if st.button("Approve", key=f"approve_{idx}"):
+        col1, col2 = st.columns(2)
+
+        # ---------- APPROVE ----------
+        with col1:
+            if st.button("✅ Approve", key=f"approve_{idx}"):
                 txn["status"] = "approved"
                 save_json(TRANSACTIONS_FILE, transactions)
-                st.success("Reward approved successfully.")
-                st.experimental_rerun()
+                st.success("Reward approved successfully!")
+                st.rerun()
 
-            st.markdown("---")
+        # ---------- REJECT ----------
+        with col2:
+            if st.button("❌ Reject", key=f"reject_{idx}"):
+                txn["status"] = "rejected"
+
+                # Refund points
+                user_id = txn["user"]
+                if user_id in users:
+                    users[user_id]["points"] += txn["points_spent"]
+                    save_json(USERS_FILE, users)
+
+                save_json(TRANSACTIONS_FILE, transactions)
+                st.warning("Reward rejected and points refunded.")
+                st.rerun()
+
+        st.markdown("---")
+
+# =========================
+# Chart 3: Reward Approval Status
+# =========================
+st.markdown("---")
+st.subheader("🎁 Reward Approval Status")
+
+if transactions:
+    status_df = pd.DataFrame(transactions)
+
+    if "status" in status_df.columns:
+        status_counts = status_df["status"].value_counts()
+        st.bar_chart(status_counts)
+    else:
+        st.info("No reward status data found.")
+else:
+    st.info("No reward transactions yet.")
 
 # =============================
 # SECTION 4: Audit Log
